@@ -15,7 +15,7 @@ const Header = ({ darkMode, toggleDarkMode }) => {
           <nav className="nav">
             <Link to="/" className="nav-link">Home</Link>
             <a 
-              href="https://github.com/souvagyadey/eda-analyzer" 
+              href="https://github.com/souvagyadey/Eda-analyzer" 
               target="_blank" 
               rel="noopener noreferrer"
               className="nav-link"
