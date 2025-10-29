@@ -188,38 +188,6 @@ eda-analyzer/
   - Distribution patterns
   - Actionable recommendations
 
-## 🚀 Deployment
-
-### Backend Deployment (Railway/Render/Heroku)
-
-1. Update `settings.py` for production:
-   - Set `DEBUG = False`
-   - Configure `ALLOWED_HOSTS`
-   - Set up PostgreSQL database
-   - Configure static files
-
-2. Add production dependencies to `requirements.txt`:
-   ```
-   gunicorn
-   psycopg2-binary
-   whitenoise
-   ```
-
-3. Create `Procfile`:
-   ```
-   web: gunicorn config.wsgi
-   ```
-
-### Frontend Deployment (Vercel/Netlify)
-
-1. Build the frontend:
-   ```bash
-   npm run build
-   ```
-
-2. Update API base URL in `src/utils/api.js` to point to production backend
-
-3. Deploy the `dist` folder
 
 ## 🤝 Contributing
 
