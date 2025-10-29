@@ -2,7 +2,7 @@
 
 A full-stack AI-powered Exploratory Data Analysis (EDA) web application that automatically generates visualizations and provides intelligent insights using Google Gemini 2.0 Flash.
 
-## 🚀 Features
+## Features
 
 - **Automatic CSV Upload & Processing**: Upload CSV files and get instant analysis
 - **Smart Data Cleaning**: Automatic handling of missing values, type inference, and outlier detection
@@ -34,13 +34,13 @@ A full-stack AI-powered Exploratory Data Analysis (EDA) web application that aut
 - **Icons**: Lucide React
 - **Styling**: Custom CSS with CSS Variables
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.12+
 - Node.js 16+
 - Google Gemini API Key ([Get one here](https://ai.google.dev/))
 
-## 🔧 Installation
+## Installation
 
 ### Backend Setup
 
@@ -156,7 +156,7 @@ eda-analyzer/
 └── README.md
 ```
 
-## 🔌 API Endpoints
+## API Endpoints
 
 - `POST /api/upload_csv/` - Upload CSV file and initiate analysis
 - `GET /api/eda_charts/<session_id>/` - Get all charts for a session
@@ -164,7 +164,7 @@ eda-analyzer/
 - `GET /api/sessions/` - List all sessions
 - `GET /api/sessions/<session_id>/` - Get session details
 
-## 🎨 Key Features Explained
+## Key Features Explained
 
 ### Data Processing
 - Automatic column name normalization
@@ -189,25 +189,17 @@ eda-analyzer/
   - Actionable recommendations
 
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 📝 License
+## License
 
 This project is open source and available under the MIT License.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Google Gemini API for AI-powered insights
 - Django REST Framework for the robust backend
 - React and Vite for the modern frontend
 - Matplotlib and Seaborn for beautiful visualizations
-
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
-
----
-
-**Built with ❤️ using Django, React, and AI**
