@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.conf import settings
+from django.core.cache import cache
 from .models import EdaSession, EdaChart
 from .serializers import FileUploadSerializer, EdaSessionSerializer, EdaChartSerializer
 from .services.data_processor import DataProcessor
@@ -98,7 +99,7 @@ class AiInsightsView(APIView):
         try:
             session = EdaSession.objects.get(session_id=session_id)
             
-            # Check if insights already exist
+            # Check if insights already exist in database
             if session.insights:
                 return Response({
                     'session_id': str(session_id),
@@ -114,40 +115,34 @@ class AiInsightsView(APIView):
             cleaned_df = processor.clean_data()
             summary = processor.get_summary()
             
-            # Get theme from request (default to 'light')
-            theme = request.GET.get('theme', 'light')
-            
-            # Generate ONLY essential charts for AI analysis
-            # This creates a separate set of charts optimized for AI insights
-            ai_chart_dir = os.path.join(settings.EDA_OUTPUT_DIR, str(session.session_id), 'ai_charts')
-            os.makedirs(ai_chart_dir, exist_ok=True)
-            
+            # Generate essential visualization charts for AI insights
+            print(f"📊 Generating visualization charts for AI insights...")
             chart_generator = ChartGenerator(
-                cleaned_df, 
-                f"{session.session_id}/ai_charts",
+                cleaned_df,
+                session.session_id,
                 settings.EDA_OUTPUT_DIR,
-                theme=theme
+                theme='light'
             )
             
-            # Generate only essential charts for AI
-            essential_charts = chart_generator.generate_essential_charts_for_ai()
+            # Generate key charts for insights
+            chart_paths = chart_generator.generate_essential_charts_for_ai()
             
-            # Get full paths for AI analysis
-            chart_paths = []
-            for chart_info in essential_charts:
-                full_path = os.path.join(settings.BASE_DIR, chart_info['path'])
-                if os.path.exists(full_path):
-                    chart_paths.append({
-                        'type': chart_info['type'],
-                        'path': full_path,
-                        'column': chart_info.get('column')
-                    })
+            # Save charts to database
+            for chart_info in chart_paths:
+                EdaChart.objects.get_or_create(
+                    session=session,
+                    chart_type=chart_info['type'],
+                    chart_path=chart_info['path'],
+                    defaults={'column_name': chart_info.get('column')}
+                )
             
-            # Generate AI insights with only essential charts
+            print(f"✅ Generated {len(chart_paths)} visualization charts")
+            
+            # Generate AI insights with CSV data and chart paths
             ai_generator = AiInsightsGenerator(settings.GEMINI_API_KEY)
             insights = ai_generator.generate_insights(cleaned_df, summary, chart_paths)
             
-            # Save insights
+            # Save insights to database
             session.insights = insights
             session.save()
             

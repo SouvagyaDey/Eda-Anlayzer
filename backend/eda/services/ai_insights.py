@@ -18,43 +18,82 @@ class AiInsightsGenerator:
             self.model = None
     
     def generate_insights(self, df: pd.DataFrame, summary: Dict[str, Any], 
-                         chart_paths: List[Dict[str, str]]) -> str:
-        """Generate comprehensive EDA insights using Gemini"""
+                         chart_paths: List[Dict[str, str]] = None) -> str:
+        """Generate comprehensive EDA insights using Gemini with visual analysis of charts"""
         
         if not self.model:
             print("⚠️ Gemini API not configured. Using fallback analysis.")
             print("ℹ️ To enable AI insights: Set GEMINI_API_KEY in .env file")
-            return self._generate_fallback_insights(df, summary)
+            return self._generate_fallback_insights(df, summary, chart_paths)
         
         try:
-            # Prepare data summary text
-            data_summary = self._prepare_data_summary(df, summary)
+            print(f"🤖 Generating AI insights using Gemini 2.0 Flash with Vision...")
+            print(f"📊 Analyzing {len(summary['columns'])} columns and {len(df)} rows...")
             
-            # Prepare prompt
-            prompt = self._create_prompt(data_summary, chart_paths)
+            # Prepare only essential data summary (no CSV data)
+            data_summary = self._prepare_compact_summary(df, summary)
             
-            # Load chart images
-            chart_images = self._load_chart_images(chart_paths)
+            # Load chart images for Gemini vision analysis
+            chart_images = []
+            if chart_paths:
+                print(f"📈 Loading {len(chart_paths)} visualization charts for visual analysis...")
+                chart_images = self._load_chart_images(chart_paths)
+                print(f"✅ Loaded {len(chart_images)} chart images")
             
-            print(f"🤖 Generating AI insights using Gemini 2.0 Flash...")
-            print(f"📊 Analyzing {len(summary['columns'])} columns and {len(chart_images)} visualizations...")
-            
-            # Generate insights with Gemini
-            if chart_images:
-                # Include images in the request
-                content = [prompt] + chart_images
-                response = self.model.generate_content(content)
-            else:
-                # Text-only request
+            if not chart_images:
+                print("⚠️ No charts loaded successfully. Generating text-only insights...")
+                prompt = self._create_text_only_prompt(data_summary, summary)
                 response = self.model.generate_content(prompt)
+                insights_text = response.text
+            else:
+                # Validate that charts have images
+                valid_charts = [c for c in chart_images if 'image' in c and c['image'] is not None]
+                
+                if not valid_charts:
+                    print("⚠️ No valid chart images. Generating text-only insights...")
+                    prompt = self._create_text_only_prompt(data_summary, summary)
+                    response = self.model.generate_content(prompt)
+                    insights_text = response.text
+                else:
+                    # Create prompt for visual analysis with charts
+                    prompt = self._create_visual_analysis_prompt(data_summary, summary, valid_charts)
+                    
+                    # Send images + text to Gemini for visual analysis
+                    print(f"🎨 Sending {len(valid_charts)} valid images to Gemini for visual analysis...")
+                    response = self.model.generate_content(prompt)
+                    insights_text = response.text
             
-            print("✅ AI insights generated successfully!")
-            return response.text
+            # Add chart references to the insights markdown
+            insights_with_charts = self._embed_charts_in_insights(insights_text, chart_paths)
+            
+            print("✅ AI insights generated successfully with visual analysis!")
+            return insights_with_charts
             
         except Exception as e:
             print(f"❌ Error generating AI insights: {str(e)}")
             print(f"🔄 Falling back to rule-based analysis...")
-            return self._generate_fallback_insights(df, summary)
+            return self._generate_fallback_insights(df, summary, chart_paths)
+    
+    def _prepare_csv_sample(self, df: pd.DataFrame, max_rows: int = 100) -> str:
+        """Prepare a CSV sample with first and last rows for Gemini analysis"""
+        
+        # Get head and tail of dataset
+        head_rows = min(50, len(df) // 2)
+        tail_rows = min(50, len(df) // 2)
+        
+        if len(df) <= max_rows:
+            # Send entire dataset if small enough
+            sample_df = df
+            sample_note = f"Complete dataset ({len(df)} rows):"
+        else:
+            # Send first 50 and last 50 rows
+            sample_df = pd.concat([df.head(head_rows), df.tail(tail_rows)])
+            sample_note = f"Dataset sample (first {head_rows} and last {tail_rows} rows of {len(df)} total):"
+        
+        # Convert to CSV string
+        csv_string = sample_df.to_csv(index=False)
+        
+        return f"{sample_note}\n\n```csv\n{csv_string}\n```\n"
     
     def _prepare_data_summary(self, df: pd.DataFrame, summary: Dict[str, Any]) -> str:
         """Prepare a detailed text summary of the dataset in markdown format"""
@@ -150,6 +189,385 @@ class AiInsightsGenerator:
             text += "\n"
         
         return text
+    
+    def _create_csv_focused_prompt(self, data_summary: str, csv_sample: str, summary: Dict[str, Any]) -> str:
+        """Create a comprehensive prompt focused on CSV data analysis"""
+        
+        prompt = f"""You are a senior data scientist with 15+ years of experience conducting Exploratory Data Analysis (EDA). Analyze the provided CSV data and generate comprehensive, actionable insights.
+
+# DATASET INFORMATION
+
+{data_summary}
+
+# CSV DATA SAMPLE
+
+{csv_sample}
+
+# YOUR TASK
+
+Provide a COMPREHENSIVE, DETAILED analysis (2000-3000 words minimum) covering the following:
+
+## 1. Executive Summary (200-300 words)
+- Dataset overview: {summary['shape']['rows']:,} rows × {summary['shape']['columns']} columns
+- Data quality status and completeness
+- 5-7 key findings with specific numbers
+- Critical patterns or anomalies discovered
+- Top 3 actionable recommendations
+
+## 2. Data Quality Assessment (400-500 words)
+
+### Completeness Analysis
+- Overall completeness rate across all columns
+- List columns with missing values (exact counts and percentages)
+- Missing data patterns: Random, systematic, or clustered?
+- Impact on analysis reliability
+- Recommendations for handling missing data (imputation methods, removal, etc.)
+
+### Data Integrity
+- Duplicate records: {summary['duplicates']:,} found
+- Data type consistency check
+- Value range validation (logical min/max for each numeric column)
+- Categorical consistency (spelling, casing, special characters)
+- Outlier vs error detection strategy
+
+## 3. Detailed Column Analysis (1000-1500 words)
+
+### Numeric Columns ({len(summary['numeric_columns'])} columns)
+
+For EACH numeric column, analyze:
+- **Distribution characteristics**: Normal, skewed, uniform, bimodal?
+- **Central tendency**: Mean, median, mode interpretation
+- **Spread**: Standard deviation, range, IQR
+- **Outliers**: Identify using IQR method or Z-scores, discuss if legitimate
+- **Business meaning**: What do these values represent?
+- **Recommendations**: Normalization needs, transformations, binning
+
+### Categorical Columns ({len(summary['categorical_columns'])} columns)
+
+For EACH categorical column, analyze:
+- **Cardinality**: Number of unique categories and what it means
+- **Distribution**: Most/least common categories with exact counts
+- **Imbalance**: Are categories evenly distributed or skewed?
+- **Data quality**: Spelling variations, case sensitivity issues
+- **Business meaning**: What do these categories represent?
+- **Recommendations**: Encoding strategy, grouping rare categories
+
+## 4. Relationships & Patterns (400-600 words)
+
+### Correlation Analysis (for numeric variables)
+- Identify strong positive correlations (>0.7)
+- Identify strong negative correlations (<-0.7)
+- Multicollinearity concerns for modeling
+- Surprising correlations requiring further investigation
+- Recommendations: Feature selection, dimensionality reduction
+
+### Cross-Column Insights
+- Relationships between categorical and numeric variables
+- Conditional distributions (e.g., salary by department)
+- Segmentation opportunities
+- Hidden patterns in data combinations
+
+## 5. Actionable Recommendations (200-300 words)
+
+### Immediate Actions (Priority 1)
+1. Critical data quality fixes required
+2. Columns that need attention before analysis
+3. Essential preprocessing steps
+
+### Important Improvements (Priority 2)
+1. Data enrichment opportunities
+2. Feature engineering suggestions
+3. Analysis depth enhancements
+
+### Optional Enhancements (Priority 3)
+1. Advanced analysis possibilities
+2. Additional data collection suggestions
+3. Long-term data strategy improvements
+
+## 6. Statistical Summary Tables
+
+Include these formatted markdown tables:
+
+### Numeric Variables Summary
+| Variable | Mean | Median | Std Dev | Min | Max | Missing % | Outliers |
+|----------|------|--------|---------|-----|-----|-----------|----------|
+[Fill for each numeric column]
+
+### Categorical Variables Summary  
+| Variable | Unique Count | Top Category | Top Count | Top % | Missing % |
+|----------|--------------|--------------|-----------|-------|-----------|
+[Fill for each categorical column]
+
+### Data Quality Scorecard
+| Metric | Value | Status |
+|--------|-------|--------|
+| Overall Completeness | XX% | ✅/⚠️/❌ |
+| Duplicate Rate | XX% | ✅/⚠️/❌ |
+| Outlier Rate | XX% | ✅/⚠️/❌ |
+| Type Consistency | XX% | ✅/⚠️/❌ |
+
+# OUTPUT FORMAT
+
+Use proper markdown formatting:
+- Use ## for main sections, ### for subsections
+- Use **bold** for emphasis
+- Use `code blocks` for column names and values
+- Use tables for statistical summaries
+- Use bullet points and numbered lists
+- Use emojis sparingly for visual appeal (✅, ⚠️, ❌, 📊, 💡, 🔍)
+
+# IMPORTANT GUIDELINES
+
+1. **Be Specific**: Always cite exact numbers, percentages, and column names
+2. **Be Actionable**: Every insight should have a practical implication
+3. **Be Thorough**: Don't skip any columns - analyze each one
+4. **Be Professional**: This report will be read by stakeholders
+5. **Be Honest**: Flag data quality issues clearly
+6. **Reference CSV Data**: Cite specific examples from the data sample provided
+
+Generate your comprehensive analysis now:"""
+        
+        return prompt
+    
+    def _prepare_compact_summary(self, df: pd.DataFrame, summary: Dict[str, Any]) -> str:
+        """Prepare a compact text summary without CSV data"""
+        
+        text = f"## Dataset Overview\n\n"
+        text += f"- **Total Rows:** {summary['shape']['rows']:,}\n"
+        text += f"- **Total Columns:** {summary['shape']['columns']}\n"
+        text += f"- **Duplicate Rows:** {summary['duplicates']:,}\n"
+        text += f"- **Numeric Columns:** {len(summary['numeric_columns'])}\n"
+        text += f"- **Categorical Columns:** {len(summary['categorical_columns'])}\n\n"
+        
+        # Column details
+        text += "## Column Summary\n\n"
+        
+        for col_info in summary['columns']:
+            text += f"### {col_info['name']}\n"
+            text += f"- Type: {col_info['dtype']}\n"
+            text += f"- Missing: {col_info['missing']} ({col_info['missing']/summary['shape']['rows']*100:.1f}%)\n"
+            text += f"- Unique: {col_info['unique']:,}\n"
+            
+            if 'statistics' in col_info and col_info['statistics']:
+                stats = col_info['statistics']
+                if stats.get('mean') is not None:
+                    text += f"- Mean: {stats['mean']:.2f}, Median: {stats.get('median', 0):.2f}\n"
+                    text += f"- Min: {stats.get('min', 0):.2f}, Max: {stats.get('max', 0):.2f}\n"
+            
+            if 'top_values' in col_info:
+                text += f"- Top values: {', '.join([f'{k} ({v})' for k, v in list(col_info['top_values'].items())[:3]])}\n"
+            
+            text += "\n"
+        
+        return text
+    
+    def _load_chart_images(self, chart_paths: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+        """Load chart images as PIL Image objects for Gemini vision"""
+        from PIL import Image
+        import os
+        from django.conf import settings
+        
+        images = []
+        
+        # Priority order: most important charts first
+        priority_types = ['correlation_heatmap', 'missing_values', 'distribution', 'pairplot', 'histogram']
+        
+        # Sort charts by priority
+        sorted_charts = sorted(chart_paths, 
+                              key=lambda x: priority_types.index(x.get('type', '')) if x.get('type') in priority_types else 999)
+        
+        print(f"   📂 Looking for charts in: {settings.EDA_OUTPUT_DIR}")
+        print(f"   📋 Charts received: {len(chart_paths)}")
+        
+        # Load only top 4-5 most important charts to keep it fast
+        for chart in sorted_charts[:5]:
+            try:
+                # Construct full path
+                chart_path = chart.get('path', '')
+                chart_type = chart.get('type', 'unknown')
+                
+                if not chart_path:
+                    print(f"   ⚠️ Empty path for chart: {chart}")
+                    continue
+                
+                # chart_path format: "eda_outputs/session-id/chart.png"
+                if chart_path.startswith('eda_outputs/'):
+                    # Remove 'eda_outputs/' prefix and construct full path
+                    relative_path = chart_path.replace('eda_outputs/', '')
+                    full_path = Path(settings.EDA_OUTPUT_DIR) / relative_path
+                    
+                    if full_path.exists():
+                        img = Image.open(str(full_path))
+                        images.append({
+                            'image': img,
+                            'type': chart['type'],
+                            'column': chart.get('column', ''),
+                            'path': chart_path
+                        })
+                        print(f"   ✅ Loaded: {chart['type']} from {full_path}")
+                    else:
+                        print(f"   ❌ File not found: {full_path}")
+                else:
+                    # Try as absolute path
+                    full_path = Path(chart_path)
+                    if full_path.exists():
+                        img = Image.open(str(full_path))
+                        images.append({
+                            'image': img,
+                            'type': chart['type'],
+                            'column': chart.get('column', ''),
+                            'path': chart_path
+                        })
+                        print(f"   ✅ Loaded: {chart['type']} from {full_path}")
+                    else:
+                        print(f"   ❌ File not found: {full_path}")
+                        
+            except Exception as e:
+                print(f"   ⚠️ Could not load {chart.get('type', 'chart')}: {str(e)}")
+                continue
+        
+        return images
+    
+    def _create_visual_analysis_prompt(self, data_summary: str, summary: Dict[str, Any], 
+                                      chart_images: List[Dict[str, Any]]) -> List:
+        """Create prompt with images for Gemini vision analysis"""
+        
+        prompt_parts = []
+        
+        # Text prompt
+        text_prompt = f"""You are a senior data scientist with 15+ years of experience in Exploratory Data Analysis. 
+
+# DATASET INFORMATION
+
+{data_summary}
+
+# VISUALIZATION ANALYSIS
+
+I'm providing you with {len(chart_images)} key visualization charts from this dataset. Please analyze these visualizations carefully and provide comprehensive insights.
+
+**Charts provided:**
+"""
+        
+        for i, chart in enumerate(chart_images, 1):
+            chart_type = chart.get('type', 'Unknown').replace('_', ' ').title()
+            column = chart.get('column', '')
+            text_prompt += f"\n{i}. **{chart_type}**"
+            if column:
+                text_prompt += f" - Column: `{column}`"
+        
+        text_prompt += """
+
+# YOUR TASK
+
+Provide a COMPREHENSIVE analysis (2000-3000 words) with the following sections:
+
+## 1. Executive Summary (200-300 words)
+- Dataset overview and key statistics
+- 5-7 major findings from the visualizations
+- Critical insights and patterns discovered
+- Top 3 actionable recommendations
+
+## 2. Visual Analysis of Charts
+
+For EACH chart provided, analyze:
+- **What the chart shows**: Describe the patterns, distributions, relationships
+- **Key insights**: What does this tell us about the data?
+- **Data quality observations**: Any issues visible in the chart?
+- **Business implications**: What actions should be taken?
+
+## 3. Data Quality Assessment
+- Completeness (missing values analysis from the chart)
+- Distribution characteristics (normal, skewed, outliers)
+- Correlation patterns (if heatmap provided)
+- Anomalies or unusual patterns
+
+## 4. Relationships & Patterns
+- Strong correlations discovered
+- Distribution characteristics
+- Outliers and anomalies
+- Segmentation opportunities
+
+## 5. Actionable Recommendations
+
+### Immediate Actions
+1. Critical data quality fixes
+2. Preprocessing requirements
+3. Feature engineering opportunities
+
+### Modeling Suggestions
+- Appropriate algorithms based on data characteristics
+- Feature selection recommendations
+- Handling of outliers and missing values
+
+### Next Steps
+- Additional analysis needed
+- Data collection suggestions
+- Visualization improvements
+
+# OUTPUT FORMAT
+
+- Use clear markdown formatting
+- Reference specific charts when making points
+- Provide specific numbers and percentages
+- Be actionable and practical
+- Flag any data quality concerns
+
+**Analyze the visualizations and generate your comprehensive insights:**
+"""
+        
+        prompt_parts.append(text_prompt)
+        
+        # Add images - ensure each chart dict has 'image' key
+        for chart in chart_images:
+            if 'image' in chart and chart['image'] is not None:
+                prompt_parts.append(chart['image'])
+            else:
+                print(f"   ⚠️ Skipping chart without image: {chart.get('type', 'unknown')}")
+        
+        return prompt_parts
+    
+    def _create_text_only_prompt(self, data_summary: str, summary: Dict[str, Any]) -> str:
+        """Create prompt when no charts are available"""
+        
+        prompt = f"""You are a senior data scientist conducting Exploratory Data Analysis.
+
+# DATASET INFORMATION
+
+{data_summary}
+
+# YOUR TASK
+
+Provide a comprehensive analysis (1500-2000 words) covering:
+
+## 1. Executive Summary
+- Dataset overview: {summary['shape']['rows']:,} rows × {summary['shape']['columns']} columns
+- Key statistics and characteristics
+- Major findings
+- Top recommendations
+
+## 2. Data Quality Assessment
+- Missing values analysis
+- Duplicate records
+- Data type consistency
+- Outlier detection needs
+
+## 3. Column Analysis
+
+Analyze each column:
+- Distribution characteristics
+- Value ranges and validity
+- Relationships with other columns
+- Data quality issues
+
+## 4. Recommendations
+- Data preprocessing steps
+- Feature engineering opportunities
+- Modeling approaches
+- Next steps for analysis
+
+Generate your detailed analysis:
+"""
+        return prompt
     
     def _create_prompt(self, data_summary: str, chart_paths: List[Dict[str, str]]) -> str:
         """Create the prompt for Gemini"""
@@ -1144,7 +1562,74 @@ Your analysis is a comprehensive professional data science report that will guid
         
         return images
     
-    def _generate_fallback_insights(self, df: pd.DataFrame, summary: Dict[str, Any]) -> str:
+    def _embed_charts_in_insights(self, insights_text: str, chart_paths: List[Dict[str, str]]) -> str:
+        """Embed chart images in the insights markdown"""
+        
+        if not chart_paths:
+            return insights_text
+        
+        # Create a visualization section to insert after the executive summary
+        viz_section = "\n\n---\n\n## 📈 Key Visualizations\n\n"
+        viz_section += "*The following charts provide visual insights into your data:*\n\n"
+        
+        # Group charts by type
+        chart_types = {}
+        for chart in chart_paths:
+            chart_type = chart['type']
+            if chart_type not in chart_types:
+                chart_types[chart_type] = []
+            chart_types[chart_type].append(chart)
+        
+        # Add charts organized by type
+        chart_labels = {
+            'missing_values': '🔍 Missing Values Analysis',
+            'correlation_heatmap': '🔗 Correlation Heatmap',
+            'histogram': '📊 Distribution Histograms',
+            'boxplot': '📦 Box Plots (Outlier Detection)',
+            'distribution': '📈 Distribution Plots',
+            'bar_chart': '📊 Categorical Distributions',
+            'pairplot': '🔬 Pairwise Relationships',
+        }
+        
+        for chart_type, charts in chart_types.items():
+            label = chart_labels.get(chart_type, chart_type.replace('_', ' ').title())
+            viz_section += f"### {label}\n\n"
+            
+            for chart in charts:
+                # Create image markdown with proper path
+                chart_path = chart['path']
+                column = chart.get('column', '')
+                
+                if column:
+                    viz_section += f"**{column}**\n\n"
+                
+                # Use the media URL path for frontend display
+                viz_section += f"![{chart_type}](/{chart_path})\n\n"
+        
+        viz_section += "---\n\n"
+        
+        # Insert visualization section after executive summary or at the beginning
+        if "## 1. Executive Summary" in insights_text or "## Executive Summary" in insights_text:
+            # Find the end of executive summary section
+            parts = insights_text.split("## 2.", 1)
+            if len(parts) == 2:
+                return parts[0] + viz_section + "## 2." + parts[1]
+            else:
+                # Try alternative format
+                parts = insights_text.split("## Data Quality", 1)
+                if len(parts) == 2:
+                    return parts[0] + viz_section + "## Data Quality" + parts[1]
+        
+        # If no specific section found, add at the beginning after title
+        lines = insights_text.split('\n', 5)
+        if len(lines) > 3:
+            return '\n'.join(lines[:3]) + '\n' + viz_section + '\n'.join(lines[3:])
+        
+        # Fallback: append to the end
+        return insights_text + "\n\n" + viz_section
+    
+    def _generate_fallback_insights(self, df: pd.DataFrame, summary: Dict[str, Any], 
+                                   chart_paths: List[Dict[str, str]] = None) -> str:
         """Generate comprehensive insights without AI when API is not available"""
         
         insights = "# 📊 Comprehensive Exploratory Data Analysis Report\n\n"
@@ -1505,5 +1990,9 @@ Your analysis is a comprehensive professional data science report that will guid
         
         insights += "---\n\n"
         insights += f"*Report generated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}*\n"
+        
+        # Add chart visualizations if available
+        if chart_paths:
+            insights = self._embed_charts_in_insights(insights, chart_paths)
         
         return insights

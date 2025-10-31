@@ -4,6 +4,10 @@ Django settings for EDA Analyzer project.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,6 +81,12 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Cache settings (disable cache for now to avoid errors)
+CACHE_TTL_AI_INSIGHTS = 7200  # 2 hours
+CACHE_TTL_SESSION_DATA = 3600  # 1 hour
+CACHE_TTL_COLUMN_INFO = 3600  # 1 hour
+CACHE_TTL_CHART_LIST = 300  # 5 minutes
 
 
 # Password validation
