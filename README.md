@@ -6,26 +6,27 @@ A full-stack AI-powered Exploratory Data Analysis (EDA) web application that aut
 
 - **Automatic CSV Upload & Processing**: Upload CSV files and get instant analysis
 - **Smart Data Cleaning**: Automatic handling of missing values, type inference, and outlier detection
-- **Rich Visualizations**: Auto-generated charts including:
-  - Histograms
-  - Box plots
-  - Correlation heatmaps
-  - Pair plots
-  - Distribution plots
+- **Interactive Plotly Visualizations**: Auto-generated charts including:
+  - Histograms with customizable bins
+  - Interactive box plots with outlier detection
+  - Dynamic correlation heatmaps
+  - Multi-variable pair plots
+  - Distribution plots with KDE overlays
   - Missing value matrices
-  - Bar charts for categorical data
-- **AI-Powered Insights**: Get intelligent analysis from Google Gemini 2.0 Flash
-- **Beautiful Dashboard**: Modern, responsive UI with interactive charts
+  - Interactive bar charts for categorical data
+  - Scatter plots with hover information
+- **AI-Powered Insights**: Get intelligent analysis from Google Gemini 2.0 Flash with visual chart analysis
+- **Beautiful Dashboard**: Modern, responsive UI with interactive Plotly charts
 - **Statistical Analysis**: Comprehensive summary statistics and data quality checks
 
 ## 🛠️ Tech Stack
 
 ### Backend
 - **Framework**: Django REST Framework
-- **Data Processing**: Pandas, NumPy
-- **Visualizations**: Matplotlib, Seaborn
-- **AI Model**: Google Gemini 2.0 Flash API
-- **Database**: SQLite (can be upgraded to PostgreSQL)
+- **Data Processing**: Pandas, NumPy, SciPy
+- **Visualizations**: Plotly (interactive charts), Kaleido (PNG export)
+- **AI Model**: Google Gemini 2.0 Flash API (multimodal vision)
+- **Database**: SQLite (development), PostgreSQL-ready (production)
 
 ### Frontend
 - **Framework**: React 18 with Vite
@@ -173,20 +174,27 @@ eda-analyzer/
 - Outlier detection using IQR method
 
 ### Chart Generation
-- Generates multiple chart types automatically
-- Limits data points for performance optimization
-- Saves charts as PNG images
-- Provides download functionality
+- Generates interactive Plotly visualizations automatically
+- Dark/light theme support for all charts
+- On-demand chart generation based on user-selected axes
+- Saves charts as high-resolution PNG images (1000x600px, 2x scale)
+- Provides download functionality for all charts
+- Intelligent chart type selection based on data types:
+  - Numeric × Numeric → Scatter plots
+  - Categorical × Numeric → Grouped box plots
+  - Categorical × Categorical → Stacked bar charts
 
 ### AI Insights
-- Uses Google Gemini 2.0 Flash for analysis
-- Sends chart images and data summary
+- Uses Google Gemini 2.0 Flash with Vision API for multimodal analysis
+- Sends chart images (PNG) and data summary for visual analysis
+- Gemini analyzes both statistical data and chart visualizations
 - Provides comprehensive insights including:
   - Data quality assessment
-  - Statistical insights
-  - Relationship analysis
-  - Distribution patterns
-  - Actionable recommendations
+  - Statistical insights with visual validation
+  - Relationship analysis from correlation heatmaps
+  - Distribution patterns from histograms and KDE plots
+  - Actionable recommendations based on visual trends
+  - Detailed markdown reports (2000-3000 words)
 
 
 ## Contributing
@@ -199,7 +207,7 @@ This project is open source and available under the MIT License.
 
 ## Acknowledgments
 
-- Google Gemini API for AI-powered insights
+- Google Gemini API for AI-powered insights with vision capabilities
 - Django REST Framework for the robust backend
 - React and Vite for the modern frontend
-- Matplotlib and Seaborn for beautiful visualizations
+- Plotly for interactive, production-ready visualizations

@@ -115,8 +115,8 @@ class AiInsightsView(APIView):
             cleaned_df = processor.clean_data()
             summary = processor.get_summary()
             
-            # Generate essential visualization charts for AI insights
-            print(f"📊 Generating visualization charts for AI insights...")
+            recommended_charts = ['missing_values', 'correlation_heatmap', 'distribution', 'pairplot']
+            
             chart_generator = ChartGenerator(
                 cleaned_df,
                 session.session_id,
@@ -124,10 +124,8 @@ class AiInsightsView(APIView):
                 theme='light'
             )
             
-            # Generate key charts for insights
-            chart_paths = chart_generator.generate_essential_charts_for_ai()
+            chart_paths = chart_generator.generate_essential_charts_for_ai(recommended_charts)
             
-            # Save charts to database
             for chart_info in chart_paths:
                 EdaChart.objects.get_or_create(
                     session=session,
@@ -136,13 +134,9 @@ class AiInsightsView(APIView):
                     defaults={'column_name': chart_info.get('column')}
                 )
             
-            print(f"✅ Generated {len(chart_paths)} visualization charts")
-            
-            # Generate AI insights with CSV data and chart paths
             ai_generator = AiInsightsGenerator(settings.GEMINI_API_KEY)
             insights = ai_generator.generate_insights(cleaned_df, summary, chart_paths)
             
-            # Save insights to database
             session.insights = insights
             session.save()
             
@@ -272,7 +266,6 @@ class GenerateCustomChartsView(APIView):
                 theme=theme
             )
             
-            # Generate specific charts
             numeric_cols = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
             categorical_cols = filtered_df.select_dtypes(include=['object', 'category']).columns.tolist()
             

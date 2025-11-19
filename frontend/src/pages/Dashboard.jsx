@@ -276,7 +276,10 @@ const Dashboard = () => {
   // Helper to get chart URL from path
   const getChartUrl = (chart) => {
     if (chart.chart_url) return chart.chart_url;
-    if (chart.chart_path) return `http://localhost:8000/media/${chart.chart_path}`;
+    if (chart.chart_path) {
+      // chart_path format: "eda_outputs/session-id/chart.png"
+      return `http://localhost:8000/${chart.chart_path}`;
+    }
     return '';
   };
 
@@ -545,6 +548,16 @@ const Dashboard = () => {
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
+                        components={{
+                          img: ({node, ...props}) => (
+                            <img
+                              {...props}
+                              src={props.src?.startsWith('http') ? props.src : `http://localhost:8000${props.src}`}
+                              style={{maxWidth: '100%', height: 'auto', margin: '20px 0', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}
+                              alt={props.alt || 'Chart visualization'}
+                            />
+                          )
+                        }}
                       >
                         {insights}
                       </ReactMarkdown>

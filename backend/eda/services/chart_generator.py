@@ -24,8 +24,8 @@ class ChartGenerator:
         self.generation_timestamp = str(int(time.time() * 1000))  # millisecond timestamp for unique filenames
 
 
-        self.label_color = "#ffffff"  # bright blue for dark mode
-        self.bg_color = "#111827"   # dark gray
+        self.label_color = "#ffffff" 
+        self.bg_color = "#111827"
         self.template = "plotly_dark"
         print(f"ChartGenerator initialized with theme: {theme}, label_color: {self.label_color}")
         
@@ -50,47 +50,64 @@ class ChartGenerator:
         if numeric_cols:
             self._generate_correlation_heatmap(numeric_cols)
             
-            # Generate ALL individual charts for ALL numeric columns (no limit)
             for col in numeric_cols:
                 self._generate_histogram(col)
                 self._generate_boxplot(col)
                 self._generate_distribution_plot(col)
             
-            # Generate pairplot if we have multiple numeric columns
             if len(numeric_cols) >= 2:
-                self._generate_pairplot(numeric_cols[:6])  # Limit pairplot to 6 for performance
+                self._generate_pairplot(numeric_cols[:6])
         
         if categorical_cols:
-            # Generate bar charts for ALL categorical columns (no limit)
             for col in categorical_cols:
                 self._generate_bar_chart(col)
         
         return self.charts
     
-    def generate_essential_charts_for_ai(self) -> List[Dict[str, str]]:
-        """Generate only essential charts for AI analysis (sent to Gemini)"""
+    def generate_essential_charts_for_ai(self, chart_types: List[str] = None) -> List[Dict[str, str]]:
+        """Generate only essential charts for AI analysis (sent to Gemini)
+        
+        Args:
+            chart_types: List of chart types to generate. If None, uses defaults.
+                       Options: 'correlation_heatmap', 'missing_values', 'distribution', 
+                                'pairplot', 'histogram', 'boxplot', 'bar_chart'
+        """
+        
+        if chart_types is None:
+            chart_types = ['missing_values', 'correlation_heatmap', 'distribution', 'pairplot']
         
         numeric_cols = self.df.select_dtypes(include=[np.number]).columns.tolist()
         categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns.tolist()
         
-        # 1. Missing values - crucial for data quality insights
-        self._generate_missing_value_chart()
-        
-        # 2. Correlation heatmap - shows relationships between variables
-        if len(numeric_cols) >= 2:
-            self._generate_correlation_heatmap(numeric_cols)
-        
-        # 3. One distribution plot for the first numeric column - shows data distribution
-        if numeric_cols:
-            self._generate_distribution_plot(numeric_cols[0])
-        
-        # 4. One bar chart for the first categorical column - shows category distribution
-        if categorical_cols:
-            self._generate_bar_chart(categorical_cols[0])
-        
-        # 5. Pairplot if multiple numeric columns exist - shows multivariate relationships
-        if len(numeric_cols) >= 2:
-            self._generate_pairplot(numeric_cols[:3])  # Limit to 3 for faster processing
+        for chart_type in chart_types:
+            try:
+                if chart_type == 'missing_values':
+                    self._generate_missing_value_chart()
+                    
+                elif chart_type == 'correlation_heatmap' and len(numeric_cols) >= 2:
+                    self._generate_correlation_heatmap(numeric_cols)
+                    
+                elif chart_type == 'distribution' and numeric_cols:
+                    for col in numeric_cols[:3]:
+                        self._generate_distribution_plot(col)
+                        
+                elif chart_type == 'histogram' and numeric_cols:
+                    for col in numeric_cols[:3]:
+                        self._generate_histogram(col)
+                        
+                elif chart_type == 'boxplot' and numeric_cols:
+                    for col in numeric_cols[:3]:
+                        self._generate_boxplot(col)
+                        
+                elif chart_type == 'pairplot' and len(numeric_cols) >= 2:
+                    self._generate_pairplot(numeric_cols[:3])
+                    
+                elif chart_type == 'bar_chart' and categorical_cols:
+                    for col in categorical_cols[:3]:
+                        self._generate_bar_chart(col)
+                        
+            except Exception as e:
+                continue
         
         return self.charts
     
@@ -549,7 +566,6 @@ class ChartGenerator:
                 if (requested is None) or ('scatter' in requested):
                     self._generate_scatter(x_axis, y_axis)
                 if (requested is None) or ('histogram' in requested):
-                    # Generate histograms for both numeric columns
                     self._generate_histogram(x_axis)
                     self._generate_histogram(y_axis)
                 if (requested is None) or ('distribution' in requested):
@@ -559,7 +575,6 @@ class ChartGenerator:
                 if (requested is None) or ('box' in requested):
                     self._generate_boxplot_xy(x_axis, y_axis)
                 if (requested is None) or ('histogram' in requested):
-                    # Generate histogram for the numeric column
                     self._generate_histogram(y_axis)
                 if (requested is None) or ('distribution' in requested):
                     self._generate_distribution_plot(y_axis)
@@ -567,14 +582,12 @@ class ChartGenerator:
                 if (requested is None) or ('box' in requested):
                     self._generate_boxplot_xy(y_axis, x_axis)
                 if (requested is None) or ('histogram' in requested):
-                    # Generate histogram for the numeric column
                     self._generate_histogram(x_axis)
                 if (requested is None) or ('distribution' in requested):
                     self._generate_distribution_plot(x_axis)
             elif x_is_cat and y_is_cat:
                 if (requested is None) or ('grouped_bar' in requested):
                     self._generate_grouped_bar(x_axis, y_axis)
-        # Only x provided
         elif x_axis:
             if x_axis in numeric:
                 if (requested is None) or ('histogram' in requested):
@@ -584,7 +597,6 @@ class ChartGenerator:
             else:
                 if (requested is None) or ('bar' in requested):
                     self._generate_bar_chart(x_axis)
-        # Only y provided
         elif y_axis:
             if y_axis in numeric:
                 if (requested is None) or ('histogram' in requested):
@@ -595,7 +607,6 @@ class ChartGenerator:
                 if (requested is None) or ('bar' in requested):
                     self._generate_bar_chart(y_axis)
         else:
-            # No axis provided -> nothing to generate
             raise ValueError('No axis provided for on-demand generation')
 
         return self.charts
