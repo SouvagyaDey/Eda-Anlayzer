@@ -10,7 +10,7 @@ const Header = ({ darkMode, toggleDarkMode }) => {
         <div className="header-content">
           <Link to="/" className="logo">
             <BarChart3 size={32} />
-            <span className="logo-text">Master EDA</span>
+            <span className="logo-text">EDA-Analyzer</span>
           </Link>
           <nav className="nav">
             <Link to="/" className="nav-link">Home</Link>

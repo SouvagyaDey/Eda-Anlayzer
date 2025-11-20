@@ -34,7 +34,7 @@ const Home = ({ darkMode }) => {
         <div className="hero-section fade-in">
           <div className="hero-header">
             <Sparkles className="sparkle-icon" size={40} />
-            <h1 className="hero-title">Master EDA: AI Agent for Charts & Insights</h1>
+            <h1 className="hero-title">EDA-Analyzer: AI Agent for Charts & Insights</h1>
             <p className="hero-subtitle">
               Upload your CSV file and get instant AI-powered exploratory data analysis with 
               beautiful visualizations and actionable insights
