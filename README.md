@@ -98,12 +98,18 @@ The backend will be available at `http://localhost:8000`
    npm install
    ```
 
-3. **Start the development server**:
+3. **Set up environment variables** (optional):
+   Create a `.env` file in the frontend directory:
+   ```env
+   VITE_API_URL=http://localhost:8000/api
+   ```
+
+4. **Start the development server**:
    ```bash
    npm run dev
    ```
 
-The frontend will be available at `http://localhost:3000`
+The frontend will be available at `http://localhost:3000` (Vite default port)
 
 ## 🎯 Usage
 
@@ -143,13 +149,17 @@ eda-analyzer/
 │   ├── src/
 │   │   ├── components/        # React components
 │   │   │   ├── Header.jsx
-│   │   │   └── FileUpload.jsx
+│   │   │   ├── FileUpload.jsx
+│   │   │   └── InsightsView.jsx
 │   │   ├── pages/            # Page components
 │   │   │   ├── Home.jsx
 │   │   │   └── Dashboard.jsx
+│   │   ├── styles/           # CSS files
 │   │   ├── utils/            # Utilities
 │   │   │   └── api.js
 │   │   ├── App.jsx
+│   │   ├── App.css
+│   │   ├── index.css
 │   │   └── main.jsx
 │   ├── index.html
 │   ├── package.json
@@ -189,12 +199,12 @@ eda-analyzer/
 - Sends chart images (PNG) and data summary for visual analysis
 - Gemini analyzes both statistical data and chart visualizations
 - Provides comprehensive insights including:
-  - Data quality assessment
-  - Statistical insights with visual validation
-  - Relationship analysis from correlation heatmaps
-  - Distribution patterns from histograms and KDE plots
-  - Actionable recommendations based on visual trends
-  - Detailed markdown reports (2000-3000 words)
+  - High-level data overview
+  - Chart-based interpretations
+  - Feature-vs-feature plot recommendations
+  - Key findings and patterns
+  - Actionable next steps for analysis
+  - Concise, structured markdown reports
 
 
 ## Contributing
