@@ -6,8 +6,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import './Dashboard.css';
-import './Dashboard-modern.css';
-import './Dashboard-v2.css';
 
 const Dashboard = () => {
   const { sessionId } = useParams();
