@@ -12,7 +12,6 @@ class EdaChartSerializer(serializers.ModelSerializer):
     def get_chart_url(self, obj):
         request = self.context.get('request')
         if request:
-            # Don't add /media/ prefix, just use the path directly with leading slash
             return request.build_absolute_uri('/' + obj.chart_path)
         return obj.chart_path
 

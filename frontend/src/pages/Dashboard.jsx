@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSessionDetail, getAiInsights, getColumnInfo, generateOnDemandCharts } from '../utils/api';
-import { Sparkles, ArrowLeft, Table, BarChart, Download, ChevronRight, Loader, Trash2 } from 'lucide-react';
+import { Sparkles, ArrowLeft, Table, BarChart, Download, Loader, Trash2, Grid, List, Maximize2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import './Dashboard.css';
+import './Dashboard-modern.css';
+import './Dashboard-v2.css';
 
 const Dashboard = () => {
   const { sessionId } = useParams();
@@ -15,9 +17,11 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('charts');
+  const [activeTab, setActiveTab] = useState('library');
   const [selectedChart, setSelectedChart] = useState(null);
   const [columnInfo, setColumnInfo] = useState(null);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [fullscreenChart, setFullscreenChart] = useState(null);
   
   // On-demand chart generation states
   const [xAxis, setXAxis] = useState('');
@@ -100,45 +104,31 @@ const Dashboard = () => {
     if (x && y) {
       // Both axes selected
       if (xIsNumeric && yIsNumeric) {
-        // Numeric x Numeric: scatter, histogram (for both), distribution (for both)
+        // Numeric x Numeric: scatter, line
         plots = [
-          { id: 'scatter', name: '📈 Scatter Plot' },
-          { id: 'histogram', name: '📊 Histogram' },
-          { id: 'distribution', name: '📉 Distribution' }
+          { id: 'scatter', name: 'Scatter Plot' },
+          { id: 'line', name: 'Line Plot' }
         ];
-      } else if (xIsCategorical && yIsNumeric) {
-        // Categorical x Numeric: box plot, histogram (for y), distribution (for y)
+      } else {
+        // Any categorical: bar chart
         plots = [
-          { id: 'box', name: '📦 Box Plot' },
-          { id: 'histogram', name: '📊 Histogram' },
-          { id: 'distribution', name: '📉 Distribution' }
-        ];
-      } else if (xIsNumeric && yIsCategorical) {
-        // Numeric x Categorical: box plot, histogram (for x), distribution (for x)
-        plots = [
-          { id: 'box', name: '📦 Box Plot' },
-          { id: 'histogram', name: '📊 Histogram' },
-          { id: 'distribution', name: '� Distribution' }
-        ];
-      } else if (xIsCategorical && yIsCategorical) {
-        // Categorical x Categorical: grouped bar only
-        plots = [
-          { id: 'grouped_bar', name: '📊 Grouped Bar' }
+          { id: 'bar_chart', name: 'Bar Chart' }
         ];
       }
     } else if (x || y) {
       // Single axis selected
       const col = xCol || yCol;
       if (col?.type === 'numeric') {
-        // Single numeric: histogram, distribution
+        // Single numeric: histogram, boxplot, distribution
         plots = [
-          { id: 'histogram', name: '📊 Histogram' },
-          { id: 'distribution', name: '📉 Distribution' }
+          { id: 'histogram', name: 'Histogram' },
+          { id: 'boxplot', name: 'Box Plot' },
+          { id: 'distribution', name: 'Distribution' }
         ];
       } else if (col?.type === 'categorical') {
         // Single categorical: bar chart only
         plots = [
-          { id: 'bar', name: '📊 Bar Chart' }
+          { id: 'bar_chart', name: 'Bar Chart' }
         ];
       }
     }
@@ -188,17 +178,18 @@ const Dashboard = () => {
       setError(null);
       setSuccessMessage(null);
       
+      // Send 'all' to backend to generate ALL possible plots
       const result = await generateOnDemandCharts(
         sessionId,
         xAxis || null,
         yAxis || null,
-        selectedPlots, // Pass selected plot types
+        selectedPlots.length === availablePlots.length ? ['all'] : selectedPlots, // If all selected, send ['all']
         theme
       );
 
       if (result.charts_generated === false && result.message) {
         // All charts already exist
-        setSuccessMessage(`📚 ${result.message} Check the Generated Charts section below.`);
+        setSuccessMessage(`${result.message} Check the Generated Charts section below.`);
         setTimeout(() => setSuccessMessage(null), 5000);
         return;
       }
@@ -211,7 +202,7 @@ const Dashboard = () => {
         
         // Show appropriate message based on what was generated
         if (result.newly_generated === 0) {
-          setSuccessMessage('📚 These plots are already in your library!');
+          setSuccessMessage('These plots are already in your library!');
         } else if (result.message) {
           setSuccessMessage(`✓ ${result.message}`);
         } else {
@@ -312,26 +303,48 @@ const Dashboard = () => {
     <div className="dashboard-page">
       <div className="container-fluid">
         {/* Header */}
-        <div className="dashboard-header">
-          <button onClick={() => navigate('/')} className="back-btn">
-            <ArrowLeft size={20} />
-            Back
-          </button>
-          <div className="header-info">
-            <h1 className="dashboard-title">{session.filename}</h1>
-            <div className="dataset-stats">
-              <div className="stat">
-                <Table size={18} />
-                <span>{session.row_count} rows</span>
-              </div>
-              <div className="stat">
-                <BarChart size={18} />
-                <span>{session.column_count} columns</span>
-              </div>
-              <div className="stat">
-                <span>📊 {session.charts?.length || 0} charts</span>
+        <div className="dashboard-header-modern">
+          <div className="header-left">
+            <button onClick={() => navigate('/')} className="back-btn-modern">
+              <ArrowLeft size={20} />
+              <span>Back to Home</span>
+            </button>
+            <div className="header-divider"></div>
+            <div className="dataset-info">
+              <div className="dataset-icon"><BarChart size={24} /></div>
+              <div>
+                <h1 className="dataset-name">{session.filename}</h1>
+                <div className="dataset-meta">
+                  <span className="meta-badge">
+                    <Table size={14} />
+                    {session.row_count?.toLocaleString()} rows
+                  </span>
+                  <span className="meta-badge">
+                    <BarChart size={14} />
+                    {session.column_count} columns
+                  </span>
+                  <span className="meta-badge chart-count">
+                    {session.charts?.length || 0} charts
+                  </span>
+                </div>
               </div>
             </div>
+          </div>
+          <div className="header-right">
+            <button
+              onClick={() => {
+                if (insights) {
+                  setActiveTab('insights');
+                } else {
+                  handleGenerateInsights();
+                }
+              }}
+              className="btn-insights-header"
+              disabled={insightsLoading}
+            >
+              <Sparkles size={18} />
+              {insightsLoading ? 'Generating...' : insights ? 'View Insights' : 'Generate AI Insights'}
+            </button>
           </div>
         </div>
 
@@ -341,8 +354,11 @@ const Dashboard = () => {
           <div className="sidebar">
             {/* Chart Generator Section */}
             {columnInfo && (
-              <div className="sidebar-generator">
-                <h3 className="generator-title">📊 Generate Charts</h3>
+              <div className="sidebar-generator-modern">
+                <div className="generator-header">
+                  <div className="generator-icon"><BarChart size={20} /></div>
+                  <h3 className="generator-title">Chart Generator</h3>
+                </div>
                 <div className="generator-controls-vertical">
                   <div className="axis-selector">
                     <label htmlFor="x-axis-select">X-Axis:</label>
@@ -425,7 +441,7 @@ const Dashboard = () => {
                   
                   {error && (
                     <div className="generator-error-small">
-                      ⚠️ {error}
+                      {error}
                     </div>
                   )}
                   
@@ -437,112 +453,231 @@ const Dashboard = () => {
                 </div>
               </div>
             )}
-
-            <div className="sidebar-divider"></div>
-            
-            <div className="sidebar-section">
-              <button
-                className={`sidebar-item ${activeTab === 'insights' ? 'active' : ''}`}
-                onClick={() => {
-                  if (insights) {
-                    setActiveTab('insights');
-                  } else {
-                    handleGenerateInsights();
-                  }
-                }}
-                disabled={insightsLoading}
-              >
-                <Sparkles size={20} />
-                <span>AI Insights</span>
-                {insightsLoading && <div className="spinner-tiny"></div>}
-              </button>
-            </div>
-
-            <div className="sidebar-divider"></div>
-
-            <div className="sidebar-section">
-              <div className="sidebar-section-header-static">
-                <BarChart size={16} />
-                <span className="sidebar-section-title">Generated Charts</span>
-                <span className="sidebar-section-count">{session.charts?.length || 0}</span>
-              </div>
-              
-              <div className="sidebar-section-content">
-                {session.charts && session.charts.length > 0 ? (
-                  session.charts.map((chart) => (
-                    <button
-                      key={chart.id}
-                      className={`sidebar-item ${activeTab === 'charts' && selectedChart?.id === chart.id ? 'active' : ''}`}
-                      onClick={() => {
-                        setActiveTab('charts');
-                        setSelectedChart(chart);
-                      }}
-                    >
-                      <BarChart size={18} />
-                      <span className="sidebar-item-text">
-                        {formatChartTitle(chart.chart_type, chart.column_name)}
-                      </span>
-                      <ChevronRight size={16} className="sidebar-item-arrow" />
-                    </button>
-                  ))
-                ) : (
-                  <div className="sidebar-empty">
-                    <p>No charts generated yet</p>
-                    <p style={{ fontSize: '12px', marginTop: '8px', opacity: 0.7 }}>
-                      Use the generator above to create charts
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Main Content Area */}
           <div className="main-content">
-            {activeTab === 'charts' && selectedChart && (
-              <div className="chart-view fade-in">
-                <div className="chart-view-header">
-                  <h2>{formatChartTitle(selectedChart.chart_type, selectedChart.column_name)}</h2>
-                  <div className="chart-actions">
-                    <button
-                      onClick={() => handleDeleteChart(selectedChart.id)}
-                      className="btn btn-danger"
-                      title="Delete Chart"
-                    >
-                      <Trash2 size={18} />
-                      Delete
-                    </button>
-                    <button
-                      onClick={() => handleDownloadChart(selectedChart)}
-                      className="btn btn-secondary"
-                      title="Download Chart"
-                    >
-                      <Download size={18} />
-                      Download
-                    </button>
+            {/* Plot Library View with Thumbnails */}
+            {activeTab === 'library' && (
+              <div className="plot-viewer-container fade-in">
+                {selectedChart ? (
+                  <>
+                    {/* Main Plot Display */}
+                    <div className="main-plot-display">
+                      <div className="plot-display-header">
+                        <div className="plot-display-info">
+                          <span className="plot-type-badge-large">{selectedChart.chart_type}</span>
+                          <h2 className="plot-display-title">
+                            {formatChartTitle(selectedChart.chart_type, selectedChart.column_name)}
+                          </h2>
+                        </div>
+                        <div className="plot-display-actions">
+                          <button
+                            onClick={() => handleDownloadChart(selectedChart)}
+                            className="action-btn-modern download"
+                          >
+                            <Download size={18} />
+                            <span>Download</span>
+                          </button>
+                          <button
+                            onClick={() => setFullscreenChart(selectedChart)}
+                            className="action-btn-modern fullscreen"
+                          >
+                            <Maximize2 size={18} />
+                            <span>Fullscreen</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteChart(selectedChart.id)}
+                            className="action-btn-modern delete"
+                          >
+                            <Trash2 size={18} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="plot-display-body">
+                        <img
+                          src={getChartUrl(selectedChart)}
+                          alt={formatChartTitle(selectedChart.chart_type, selectedChart.column_name)}
+                          className="main-plot-image"
+                          onError={(e) => {
+                            console.error('Failed to load chart:', getChartUrl(selectedChart));
+                            e.target.alt = 'Failed to load chart';
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Thumbnail Strip */}
+                    {session.charts && session.charts.length > 1 && (
+                      <div className="thumbnail-strip">
+                        <div className="thumbnail-strip-header">
+                          <span className="thumbnail-label">All Plots ({session.charts.length})</span>
+                        </div>
+                        <div className="thumbnail-grid">
+                          {session.charts.map((chart) => (
+                            <div
+                              key={chart.id}
+                              className={`thumbnail-item ${selectedChart?.id === chart.id ? 'active' : ''}`}
+                              onClick={() => setSelectedChart(chart)}
+                            >
+                              <img
+                                src={getChartUrl(chart)}
+                                alt={formatChartTitle(chart.chart_type, chart.column_name)}
+                                className="thumbnail-img"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.parentElement.classList.add('error');
+                                }}
+                              />
+                              <div className="thumbnail-overlay">
+                                <span className="thumbnail-type">{chart.chart_type}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="empty-plot-viewer">
+                    <BarChart size={80} className="empty-icon" />
+                    <h3>Select a plot to view</h3>
+                    <p>Choose a plot from the sidebar to display it here</p>
                   </div>
-                </div>
-                <div className="chart-view-body">
-                  <img
-                    src={getChartUrl(selectedChart)}
-                    alt={selectedChart.chart_type}
-                    className="chart-view-image"
-                    onError={(e) => {
-                      console.error('Failed to load chart:', getChartUrl(selectedChart));
-                      e.target.alt = 'Failed to load chart';
-                    }}
-                  />
+                )}
+              </div>
+            )}
+
+            {/* Fullscreen Modal */}
+            {fullscreenChart && (
+              <div className="fullscreen-modal" onClick={() => setFullscreenChart(null)}>
+                <div className="fullscreen-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="fullscreen-header">
+                    <div>
+                      <span className="fullscreen-badge">{fullscreenChart.chart_type}</span>
+                      <h2 className="fullscreen-title">
+                        {formatChartTitle(fullscreenChart.chart_type, fullscreenChart.column_name)}
+                      </h2>
+                    </div>
+                    <div className="fullscreen-actions">
+                      <button
+                        onClick={() => handleDownloadChart(fullscreenChart)}
+                        className="fullscreen-btn"
+                      >
+                        <Download size={20} />
+                        Download
+                      </button>
+                      <button
+                        onClick={() => setFullscreenChart(null)}
+                        className="fullscreen-btn close"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="fullscreen-body">
+                    <img
+                      src={getChartUrl(fullscreenChart)}
+                      alt={formatChartTitle(fullscreenChart.chart_type, fullscreenChart.column_name)}
+                      className="fullscreen-image"
+                    />
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeTab === 'insights' && (
+            {activeTab === 'charts' && selectedChart && (
+              <>
+                <div className="chart-view-modern fade-in">
+                  <div className="chart-view-header-modern">
+                    <div className="chart-header-left">
+                      <div className="chart-type-badge">{selectedChart.chart_type}</div>
+                      <h2 className="chart-title">{formatChartTitle(selectedChart.chart_type, selectedChart.column_name)}</h2>
+                    </div>
+                    <div className="chart-actions-modern">
+                      <button
+                        onClick={() => handleDownloadChart(selectedChart)}
+                        className="btn-action-modern btn-download"
+                        title="Download Chart"
+                      >
+                        <Download size={18} />
+                        <span>Download</span>
+                      </button>
+                      <button
+                        onClick={() => setFullscreenChart(selectedChart)}
+                        className="btn-action-modern btn-fullscreen"
+                        title="Fullscreen"
+                      >
+                        <Maximize2 size={18} />
+                        <span>Fullscreen</span>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteChart(selectedChart.id)}
+                        className="btn-action-modern btn-delete"
+                        title="Delete Chart"
+                      >
+                        <Trash2 size={18} />
+                        <span>Delete</span>
+                      </button>
+                  </div>
+                </div>
+                <div className="chart-view-body">
+                    <img
+                      src={getChartUrl(selectedChart)}
+                      alt={selectedChart.chart_type}
+                      className="chart-view-image"
+                      onError={(e) => {
+                        console.error('Failed to load chart:', getChartUrl(selectedChart));
+                        e.target.alt = 'Failed to load chart';
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Thumbnail Strip for Charts Tab */}
+                {session.charts && session.charts.length > 1 && (
+                  <div className="thumbnail-strip">
+                    <div className="thumbnail-strip-header">
+                      <span className="thumbnail-label">All Plots ({session.charts.length})</span>
+                    </div>
+                    <div className="thumbnail-grid">
+                      {session.charts.map((chart) => (
+                        <div
+                          key={chart.id}
+                          className={`thumbnail-item ${selectedChart?.id === chart.id ? 'active' : ''}`}
+                          onClick={() => setSelectedChart(chart)}
+                        >
+                          <img
+                            src={getChartUrl(chart)}
+                            alt={formatChartTitle(chart.chart_type, chart.column_name)}
+                            className="thumbnail-img"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.parentElement.classList.add('error');
+                            }}
+                          />
+                          <div className="thumbnail-overlay">
+                            <span className="thumbnail-type">{chart.chart_type}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}            {activeTab === 'insights' && (
               <div className="insights-view fade-in">
                 {insights ? (
-                  <div className="insights-card">
-                    <div className="insights-header">
-                      <Sparkles size={24} />
-                      <h2>AI-Powered Analysis</h2>
+                  <div className="insights-card-modern">
+                    <div className="insights-header-modern">
+                      <div className="insights-icon-wrapper">
+                        <Sparkles size={24} />
+                      </div>
+                      <div>
+                        <h2>AI-Powered Data Analysis</h2>
+                        <p className="insights-subtitle">Intelligent insights generated by Gemini AI</p>
+                      </div>
                     </div>
                     <div className="insights-content">
                       <ReactMarkdown 

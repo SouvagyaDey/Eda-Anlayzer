@@ -31,7 +31,10 @@ class DataProcessor:
         for col in df.columns:
             # Try to convert to numeric
             try:
-                df[col] = pd.to_numeric(df[col], errors='ignore')
+                numeric_col = pd.to_numeric(df[col], errors='coerce')
+                # Only convert if at least some values are numeric
+                if not numeric_col.isna().all():
+                    df[col] = pd.to_numeric(df[col], errors='ignore')
             except:
                 pass
             
